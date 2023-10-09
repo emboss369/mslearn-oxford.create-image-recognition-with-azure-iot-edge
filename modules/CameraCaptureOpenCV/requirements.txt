@@ -1,0 +1,6 @@
+numpy==1.25.2
+azure-iot-device~=2.7.0
+requests
+opencv-python==4.5.5.64
+ptvsd 
+pygame==2.0.2

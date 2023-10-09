@@ -107,7 +107,7 @@ async def main():
         PREDICT_THRESHOLD = os.getenv('Threshold', .75)
         IMAGE_PROCESSING_ENDPOINT = os.getenv('AiEndpoint', 'http://localhost:80/image')
         AZURE_SPEECH_SERVICES_KEY = os.getenv('azureSpeechServicesKey', '2f57f2d9f1074faaa0e9484e1f1c08c1')
-        SPEECH_MAP_FILENAME = os.getenv('SpeechMapFilename', 'speech_map_australian.json')
+        SPEECH_MAP_FILENAME = os.getenv('SpeechMapFilename', 'speech_map_american.json')
 
 
         # The client object is used to interact with your Azure IoT hub.

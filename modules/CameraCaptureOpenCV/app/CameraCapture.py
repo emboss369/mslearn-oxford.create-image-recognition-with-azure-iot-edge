@@ -67,7 +67,7 @@ class CameraCapture(object):
         self.vs = None
 
         self.speech_map = None
-        self.speech_voice = 'en-AU-Catherine'
+        self.speech_voice = 'en-US-JennyNeural'
 
         self.speech_map_filename = speechMapFileName
 
@@ -78,7 +78,7 @@ class CameraCapture(object):
                 self.speech_map = json_data.get('map')
 
         self.tts = text2speech.TextToSpeech(
-            azureSpeechServiceKey, enableMemCache=True, enableDiskCache=True, voice=self.speech_voice)
+            azureSpeechServiceKey, enableMemCache=False, enableDiskCache=True, voice=self.speech_voice)
         
         text = self.__localize_text('Starting scanner')
         self.tts.play('Starting scanner' if text is None else text)

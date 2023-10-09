@@ -36,10 +36,13 @@ class TextToSpeech():
 
     def _playAudio(self, audio):
         self.sound = mixer.Sound(audio)
-        self.sound.play()        
+        self.sound.play()   
+        print("発話始")     
         time.sleep(self.sound.get_length())
+        print("発話終")  
 
     def play(self, text):
+        print("[play]       : " + text)
         if text is None or text == '':
             return
 

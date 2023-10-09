@@ -6,8 +6,8 @@ import requests
 import time
 from xml.etree import ElementTree
 
-TOKEN_URL = "https://southeastasia.api.cognitive.microsoft.com/sts/v1.0/issuetoken"
-BASE_URL = "https://southeastasia.tts.speech.microsoft.com/"
+TOKEN_URL = "https://japaneast.api.cognitive.microsoft.com/sts/v1.0/issuetoken"
+BASE_URL = "https://japaneast.tts.speech.microsoft.com/"
 TEXT_TO_SPEECH_PATH = "cognitiveservices/v1"
 VOICES_PATH = "cognitiveservices/voices/list"
 
@@ -87,12 +87,14 @@ class AzureSpeechServices(object):
         voice.set('name', self.short_voice_name)
         voice.text = text
         body = ElementTree.tostring(xml_body)
+        print(body)
 
         response = requests.post(constructed_url, headers=headers, data=body)
 
         if response.status_code == 200:
             return response.content
         else:
+            print(response)
             print("\nStatus code: " + str(response.status_code) +
                   "\nSomething went wrong. Check your subscription key and headers.\n")
             return None
