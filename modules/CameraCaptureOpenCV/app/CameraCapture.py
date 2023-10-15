@@ -49,8 +49,8 @@ class CameraCapture(object):
             azureSpeechServiceKey,
             predictThreshold,
             imageProcessingEndpoint,
-            sendToHubCallback,
-            speechMapFileName
+            speechMapFileName,
+            sendToHubCallback = None
     ):
         self.videoPath = videoPath
 
@@ -58,6 +58,8 @@ class CameraCapture(object):
         self.imageProcessingEndpoint = imageProcessingEndpoint
         self.imageProcessingParams = ""
         self.sendToHubCallback = sendToHubCallback
+        self.speech_map_filename = None
+        self.azureSpeechServiceKey = azureSpeechServiceKey
 
 
         if self.__IsInt(videoPath):
@@ -69,20 +71,40 @@ class CameraCapture(object):
         self.speech_map = None
         self.speech_voice = 'en-US-JennyNeural'
 
-        self.speech_map_filename = speechMapFileName
+        # self.speech_map_filename = speechMapFileName
 
+        # if speechMapFileName is not None and os.path.isfile(self.speech_map_filename):
+        #     with open(self.speech_map_filename, encoding='utf-8') as f:
+        #         json_data = json.load(f)
+        #         self.speech_voice = json_data.get('voice')
+        #         self.speech_map = json_data.get('map')
+        #         print(self.speech_voice)
+        #         print(self.speech_map)
+        self.changeLang(speechMapFileName)
+
+
+        # self.tts = text2speech.TextToSpeech(
+        #     azureSpeechServiceKey, enableMemCache=True, enableDiskCache=True, voice=self.speech_voice)
+        
+        text = self.__localize_text('Starting scanner')
+        self.tts.play('Starting scanner' if text is None else text)
+
+
+    def changeLang(self, speechMapFileName):
+        if speechMapFileName == self.speech_map_filename:
+            return
+
+        self.speech_map_filename = speechMapFileName
         if speechMapFileName is not None and os.path.isfile(self.speech_map_filename):
             with open(self.speech_map_filename, encoding='utf-8') as f:
                 json_data = json.load(f)
                 self.speech_voice = json_data.get('voice')
                 self.speech_map = json_data.get('map')
-
-        self.tts = text2speech.TextToSpeech(
-            azureSpeechServiceKey, enableMemCache=True, enableDiskCache=True, voice=self.speech_voice)
+                print(self.speech_voice)
+                print(self.speech_map)
         
-        text = self.__localize_text('Starting scanner')
-        self.tts.play('Starting scanner' if text is None else text)
-
+        self.tts = text2speech.TextToSpeech(
+            self.azureSpeechServiceKey, enableMemCache=True, enableDiskCache=True, voice=self.speech_voice)
 
     def __buildSentence(self, tag):
         vowels = ('a', 'e', 'i', 'o', 'u', 'A', 'E', 'I', 'O', 'U')
@@ -174,6 +196,36 @@ class CameraCapture(object):
 
             # slow things down a bit - 4 frame a second is fine for demo purposes and less battery drain and lower Raspberry Pi CPU Temperature
             time.sleep(0.25)
+
+    def scan(self, fileName):
+        self.changeLang(fileName)
+
+        frame = None
+        try:
+
+            frame = self.vs.read()
+
+        except:
+            print('self.vs error')
+            return
+
+        if self.imageProcessingEndpoint != "":
+
+            encodedFrame = cv2.imencode(".jpg", frame)[1].tostring()
+            try:
+                response = self.__sendFrameForProcessing(encodedFrame)
+                # print(response)
+                # forwarding outcome of external processing to the EdgeHub
+                if response != "[]" and self.sendToHubCallback is not None:
+                    try:
+                        self.sendToHubCallback(response)
+                    except:
+                        print(
+                            'Issue sending telemetry')
+            except:
+                print('connectivity issue')
+
+
 
     def __exit__(self, exception_type, exception_value, traceback):
         pass

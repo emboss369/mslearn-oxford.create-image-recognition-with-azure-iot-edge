@@ -30,7 +30,7 @@ COPY requirements.txt ./
 RUN pip install -r requirements.txt
 
 COPY /app/*.py ./
-
+COPY /app/*.json ./
 
 ENV PA_ALSA_PLUGHW=1
 
@@ -40,4 +40,3 @@ ENV PYTHONUNBUFFERED=1
 EXPOSE 5678
 
 ENTRYPOINT [ "python3", "iotedge_camera.py" ]
-

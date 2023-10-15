@@ -1,107 +1,79 @@
-# Copyright (c) Microsoft. All rights reserved.
-# Licensed under the MIT license. See LICENSE file in the project root for
-# full license information.
-
 import os
-import random
+import asyncio # asyncio は async/await 構文を使い 並行処理の コードを書くためのライブラリ
 import sys
-import time
-import asyncio
-from azure.iot.device import IoTHubModuleClient, Message
-# import ptvsd
+import signal # 非同期イベントにハンドラを設定する
+import threading # スレッドベースの並列処理
+from azure.iot.device.aio import IoTHubModuleClient # このライブラリは、IoT デバイスから Azure IoT サービスと通信するための非同期クライアントを提供します。
 
-# ptvsd.enable_attach(address=('0.0.0.0', 5678))
-# ptvsd.wait_for_attach()
-
-
-# from iothub_client import IoTHubModuleClient, IoTHubClientError, IoTHubTransportProvider
-# from iothub_client import IoTHubMessage, IoTHubMessageDispositionResult, IoTHubError
+# main.py ファイルの上部で、json ライブラリをインポートします。
+import json
 
 import CameraCapture
 from CameraCapture import CameraCapture
 
+# Event indicating client stop
+stop_event = threading.Event()
+
+SPEECH_MAP_FILENAME = None
+
 
 # global counters
-SEND_CALLBACKS = 0
-module_client = None
+# TEMPERATURE_THRESHOLD、RECEIVED_MESSAGES および TWIN_CALLBACKS 変数の
+# グローバル定義を追加します。 温度のしきい値により、データが IoT Hub に送信される
+# 基準値が設定されます。データは、マシンの測定温度がこの値を超えると送信されます。
+TEMPERATURE_THRESHOLD = 25
+TWIN_CALLBACKS = 0
+RECEIVED_MESSAGES = 0
 
 
-def send_to_Hub_callback(strMessage):
-    if strMessage == []:
-        return
+def create_client():
+    client = IoTHubModuleClient.create_from_edge_environment()
 
-    message = Message(strMessage)
-    message.content_encoding = "utf-8"
-    message.custom_properties["appid"] = "scanner";
-
-
-    # hubManager.send_event_to_output("output1", message, 0)
-    print('sent from send_to_Hub_callback')
-
-# Callback received when the message that we're forwarding is processed.
-
-
-def send_confirmation_callback(message, result, user_context):
-    global SEND_CALLBACKS
-    SEND_CALLBACKS += 1
+    # 受信したメッセージを処理する機能を定義する
+    # Azure IoT Edge ルート通信コールバックは receive_message_handler() で実装されています。
+    # Pythonでは関数内で関数を定義できます。receive_message_handler関数は、create_client関数内のネストした関数ですね
+    async def receive_message_handler(message):
+        global RECEIVED_MESSAGES # 関数内でグローバル変数にアクセス
+        print("Message received")
+        size = len(message.data) # ログ表示のためにメッセージサイズ取得
+        message_text = message.data.decode('utf-8') # データをデコードする
+        print("    Data: <<<{data}>>> & Size={size}".format(data=message.data, size=size))
+        print("    Properties: {}".format(message.custom_properties))
+        RECEIVED_MESSAGES += 1
+        print("Total messages received: {}".format(RECEIVED_MESSAGES))
 
 
-class HubManager(object):
+    # 受信したツインパッチに対応する機能を定義する。
+    # これは、設定変更をIoT Hub側から行える機能で、例えば温度センサーが日本全国100箇所にあったとするじゃない？
+    # その場合に全国行脚しなくてもIoT Hub上（クラウド上）で操作すれば、例えば下の例のようにTEMPERATURE_THRESHOLDの値を
+    # 変更できちゃう、というわけです。
+    async def receive_twin_patch_handler(twin_patch):
+        global SPEECH_MAP_FILENAME
+        global TWIN_CALLBACKS
+        print("Twin Patch received")
+        print("     {}".format(twin_patch))
+        if "SpeechMapFilename" in twin_patch:
+            SPEECH_MAP_FILENAME = twin_patch["SpeechMapFilename"]
+            
+        TWIN_CALLBACKS += 1
+        print("Total calls confirmed: {}".format(TWIN_CALLBACKS))
 
-    async def __init__(
-            self
-    ):
-        # The client object is used to interact with your Azure IoT hub.
-        module_client = IoTHubModuleClient.create_from_edge_environment()
-        await self.client.connect()
-
-    def send_event_to_output(self, outputQueueName, event, send_context):
-        pass
-        
-        # self.client.send_message(message);
-        # self.client.send_event_async(
-        #     outputQueueName, event, send_confirmation_callback, send_context)
-
-
-def initialise(
-        videoPath,
-        bingSpeechKey,
-        predictThreshold,
-        imageProcessingEndpoint="",
-        speechMapFileName = None
-):
-    '''
-    Capture a camera feed, send it to processing and forward outputs to EdgeHub
-
-    :param str connectionString: Edge Hub connection string. Mandatory.
-    :param int videoPath: camera device path such as /dev/video0 or a test video file such as /TestAssets/myvideo.avi. Mandatory.
-    :param str imageProcessingEndpoint: service endpoint to send the frames to for processing. Example: "http://face-detect-service:8080". Leave empty when no external processing is needed (Default). Optional.
-
-    '''
     try:
-        print("\nPython %s\n" % sys.version)
-        print("Camera Capture Azure IoT Edge Module. Press Ctrl-C to exit.")
+        # クライアントにハンドラーを設定する
+        client.on_message_received = receive_message_handler
+        client.on_twin_desired_properties_patch_received = receive_twin_patch_handler
+    except:
+        # 障害発生時のクリーンアップ
+        client.shutdown()
+        raise
 
-        # global hubManager
-        # hubManager = HubManager()
-
-        with CameraCapture(videoPath, bingSpeechKey, predictThreshold, imageProcessingEndpoint, send_to_Hub_callback, speechMapFileName) as cameraCapture:
-            cameraCapture.start()
-    except KeyboardInterrupt:
-        print("Camera capture module stopped")
-
-
-def __convertStringToBool(env):
-    if env in ['True', 'TRUE', '1', 'y', 'YES', 'Y', 'Yes']:
-        return True
-    elif env in ['False', 'FALSE', '0', 'n', 'NO', 'N', 'No']:
-        return False
-    else:
-        raise ValueError('Could not convert string to bool.')
+    return client
 
 
-async def main():
-    global module_client
+async def run_sample(client):
+    global SPEECH_MAP_FILENAME
+    # このコルーチンをカスタマイズして、モジュールが開始するあらゆるタスクを実行させる
+    # e.g. 送信
     try:
         VIDEO_PATH = os.getenv('Video', '0')
         PREDICT_THRESHOLD = os.getenv('Threshold', .75)
@@ -109,23 +81,46 @@ async def main():
         AZURE_SPEECH_SERVICES_KEY = os.getenv('azureSpeechServicesKey', '2f57f2d9f1074faaa0e9484e1f1c08c1')
         SPEECH_MAP_FILENAME = os.getenv('SpeechMapFilename', 'speech_map_american.json')
 
-
-        # The client object is used to interact with your Azure IoT hub.
-        module_client = IoTHubModuleClient.create_from_edge_environment()
-
-        module_client.connect()
-
     except ValueError as error:
         print(error)
         sys.exit(1)
+    with CameraCapture(VIDEO_PATH, AZURE_SPEECH_SERVICES_KEY, PREDICT_THRESHOLD, IMAGE_PROCESSING_ENDPOINT, SPEECH_MAP_FILENAME, None) as capture:
+        print(capture)
+        while True:
+            capture.scan(SPEECH_MAP_FILENAME)
+            await asyncio.sleep(1)
 
-    initialise(VIDEO_PATH, AZURE_SPEECH_SERVICES_KEY,
-         PREDICT_THRESHOLD, IMAGE_PROCESSING_ENDPOINT, SPEECH_MAP_FILENAME)
+
+def main():
+
+    # Pythonのバージョンをチェックして古ければエラーで止めます。
+    if not sys.version >= "3.5.3":
+        raise Exception( "The sample requires python 3.5.3+. Current version of Python: %s" % sys.version )
+    print ( "IoT Hub Client for Python" )
+
+    # NOTE: Client is implicitly connected due to the handler being set on it
+    client = create_client()
+
+    # Edgeでモジュール終了時にクリーンアップするハンドラを定義する。
+    def module_termination_handler(signal, frame):
+        print ("IoTHubClient sample stopped by Edge")
+        stop_event.set()
+
+    # Edgeの終了ハンドラを設定する
+    signal.signal(signal.SIGTERM, module_termination_handler)
+
+    # サンプルを実行する
+    loop = asyncio.get_event_loop()
+    try:
+        loop.run_until_complete(run_sample(client))
+    except Exception as e:
+        print("Unexpected error %s " % e)
+        raise
+    finally:
+        print("Shutting down IoT Hub Client...")
+        loop.run_until_complete(client.shutdown())
+        loop.close()
+
 
 if __name__ == "__main__":
-    # loop = asyncio.get_event_loop()
-    # loop.run_until_complete(main())
-    # loop.close()
-
-    # If using Python 3.7 or above, you can use following code instead:
-    asyncio.run(main())
+    main()

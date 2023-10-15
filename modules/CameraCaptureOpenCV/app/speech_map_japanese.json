@@ -1,0 +1,25 @@
+{
+    "voice": "ja-JP-NanamiNeural",
+    "map": [
+        {
+            "key": "Green Apple",
+            "value": "青りんごをスキャンしました"
+        },
+        {
+            "key": "Red Apple",
+            "value": "赤リンゴをスキャンしました"
+        },
+        {
+            "key": "Orange",
+            "value": "ミカンをスキャンしました"
+        },
+        {
+            "key": "Banana",
+            "value": "バナナをスキャンしました"
+        },
+        {
+            "key": "Starting scanner",
+            "value": "スキャン開始します"
+        }
+    ]
+}
