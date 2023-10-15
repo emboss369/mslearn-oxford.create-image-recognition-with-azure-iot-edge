@@ -355,3 +355,6 @@ config/
 
 # TEST
 test*.py
+
+# temp file
+.cache-audio/

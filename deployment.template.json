@@ -72,6 +72,7 @@
                                     "SpeechMapFilename=speech_map_american.json"
                                 ],
                                 "HostConfig": {
+                                    "PortBindings": {
                                         "5678/tcp": [
                                             {
                                                 "HostPort": "5678"
